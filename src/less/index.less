@@ -1,5 +1,4 @@
 p, h1, h2, h3, h4, h5, h6 {
-  color: #000;
   margin: 0;
 }
 ul, li {
@@ -56,7 +55,12 @@ body {
       display: block;
       width: 100%;
       height: 100%;
-      border: none;
+      border-radius: 50%;
+    }
+    .move {
+      -webkit-animation: move 15s infinite linear;
+      -o-animation: move 15s infinite linear;
+      animation: move 15s infinite linear;
     }
   }
 }
@@ -176,5 +180,73 @@ body {
     .list-btn {
       background-image: url(../img/icon-list.png);
     }
+  }
+}
+.play-list {
+  width: 100%;
+  height: 216px;
+  background: #fff;
+  z-index: 1000;
+  bottom: -216px;
+  position: absolute; }
+.play-list div {
+  height: 30px;
+  line-height: 30px;
+  font-size: 25px;
+  border-bottom: 1px solid gray;
+  border-radius: 5px;
+  text-align: center; }
+.play-list ul li {
+  width: 100%;
+  height: 30px;
+  line-height: 30px;
+  font-size: 19px;
+  border-bottom: 1px solid gray;
+  border-radius: 5px;
+  text-align: center; }
+.play-list .playing {
+  color: red; }
+
+.show {
+  -webkit-animation: cube 0.5s  ease;
+  animation: cube 0.5s  ease;
+  -webkit-animation-fill-mode: forwards;
+  animation-fill-mode: forwards; }
+
+.hide {
+  -webkit-animation: returnCube 0.5s  ease;
+  animation: returnCube 0.5s  ease;
+  -webkit-animation-fill-mode: forwards;
+  animation-fill-mode: forwards; }
+
+@-webkit-keyframes cube {
+  0% {
+    bottom: -216px; }
+  100% {
+    bottom: 0; } }
+
+@keyframes cube {
+  0% {
+    bottom: -216px; }
+  100% {
+    bottom: 0; } }
+
+@-webkit-keyframes returnCube {
+  0% {
+    bottom: 0; }
+  100% {
+    bottom: -216px; } }
+
+@keyframes returnCube {
+  0% {
+    bottom: 0; }
+  100% {
+    bottom: -216px; } }
+@keyframes move {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
   }
 }
