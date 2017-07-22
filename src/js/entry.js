@@ -1,90 +1,78 @@
 import '../less/index.less';
 
-//数据接口
 let dataUrl = './data/data.json';
-
-//作用域
 let $scope = $(document.body);
+let $loadingLayer = $('.loading-layer');
 
-let AudioManager = function (audioData) {
-    //绑定数据
-    this.dataList = audioData;
-    //索引
+/********** AudioManager ********/
+let AudioManager = function (dataList) {
+    this.dataList = dataList;
     this.index = 0;
-
-    this.len = audioData.length;
-
+    this.len = dataList.length;
     this.audio = new Audio();
-
-
     this.audio.preload = 'auto';
-
-    this.duration = audioData[0].duration;
-
+    this.duration = dataList[0].duration;
     this.setAudio();
-
-    this.autoplay = false;
-
+    this.bindAudioEvent();
+    this.autoPlay = false;
 };
 
 AudioManager.prototype = {
     playNext: function () {
         this.index++;
-
         if (this.index === this.len) {
-            this.index = 0
+            this.index = 0;
         }
-
         this.setAudio();
     },
     playPrev: function () {
         this.index--;
 
         if (this.index === -1) {
-            this.index = this.len-1;
+            this.index = this.len - 1;
         }
-
         this.setAudio();
     },
     playIndex: function (index) {
-        this.index = index
-
-        this.autoplay = true;
+        this.index = index;
+        this.autoPlay = true;
 
         this.setAudio();
     },
-    setAudio: function () {
+    getCurInfo: function () {
+        return this.dataList[this.index];
+    },
+    bindAudioEvent: function () {
+        let _self = this;
 
+        $(this.audio).on('ended', function () {
+            _self.playNext();
+        }).on('canplaythrough', function () {
+            $loadingLayer.hide();
+        });
+    },
+    setAudio: function () {
         let data = this.dataList[this.index];
 
         this.duration = data.duration;
         this.audio.src = data.audio;
         this.audio.load();
 
-        if (this.autoplay) {
+        if (this.autoPlay) {
             this.play();
         }
+
         $scope.trigger('changeAudio');
     },
-    play: function () {
-        this.autoplay = true;
-        this.audio.play();
+    getDurationTime: function () {
+        return this.duration;
     },
-    pause: function () {
-        this.autoplay = false;
-        this.audio.pause();
-    },
-    getCurrentInfo: function () {
-        return this.dataList[this.index];
-    },
-    getPlayRatio: function () {
-        return this.audio.currentTime / this.duration;
-    },
-    getCurrentTime: function (ratio) {
+    getCurTime: function (ratio) {
         let curTime;
-        if(ratio){
+
+        if (ratio) {
             curTime = ratio * this.duration;
-        }else{
+        } else {
             curTime = this.audio.currentTime;
         }
 
@@ -92,233 +80,238 @@ AudioManager.prototype = {
     },
     jumpToPlay: function (ratio) {
 
-        let time = ratio * this.duration;
-        console.log(time);
+        let audioTime = ratio * this.duration;
 
-        this.audio.currentTime = time;
-        console.log(this.audio.currentTime);
-        this.play();
+        this.audio.currentTime = audioTime;
+
+        this.audio.play();
+    },
+    getPlayRation: function () {
+        return this.audio.currentTime / this.duration;
+    },
+    play: function () {
+        this.autoPlay = true;
+        this.audio.play();
+    },
+    pause: function () {
+        this.autoPlay = false;
+        this.audio.pause();
     }
 };
+/********** AudioManager End ********/
 
+/********** controlManager Start ********/
 let controlManager = (function () {
-    let $songImg = $scope.find('.song-img img');
-    let $songInfo = $scope.find('.song-info');
-    let $songDuration = $scope.find('.all-time');
-    let $curTime = $scope.find('.cur-time');
-    let $proTop = $scope.find('.pro-top');
-    let likeList = [false, false, false, false, false];
-    let frameId;
+    let $songImg = $scope.find('.song-img img'),
+        $songInfo = $scope.find('.song-info'),
+        $likeBtn = $scope.find('.like-btn'),
+        $playBtn = $scope.find('.play-btn'),
+        $timeCur = $scope.find('.cur-time'),
+        $timeDuration = $scope.find('.all-time'),
+        $proTop = $scope.find('.pro-top'),
+        likeList = [false, false, false, false, false],
+        frameId;
 
-    //渲染背景图
-    function setImageBg (img) {
-        $songImg.attr('src', img.src);
-        blurImg(img,$scope.find('.content-wrapper'));
-    }
-
-    //渲染歌曲信息
-    function renderInfo (info) {
-        let html = `<h1 class="song-name">`+info.song+`</h1>
-                    <h3 class="singer-name">`+info.singer+`</h3>
-                    <h3 class="album">`+info.album+`</h3>
-                    <h3 class="rhythm">`+info.rhythm+`</h3>
-                    <h3 class="Lyric">`+info.lyric+`</h3>`;
-        $songInfo.html(html);
-    }
-
-    //渲染时间
-    function formatTime (duration) {
-        let minute = Math.floor(duration / 60);
-        let second = duration - minute * 60;
-        minute < 10 ? minute = '0' + minute: minute;
-        second < 10 ? second = '0' + second: second;
-        return minute + ':' + second;
-    }
-
-    //渲染页面
-    function renderPage () {
-        let curInfo = audioManager.getCurrentInfo();
-
-        //图片信息
-        let img = new Image();
-        img.onload = function () {
-            setImageBg(this)
-        };
-        img.src = curInfo.image;
-        //重置图片旋转
-        $songImg.removeClass('move');
-        $songImg.css({animationPlayState : '',transform : ''});
-
-        //歌曲信息
-        renderInfo(curInfo);
-
-        //渲染时间
-        $songDuration.text(formatTime(curInfo.duration));
-
-        //收藏按钮
-        if (likeList[audioManager.index]) {
-            $scope.find('.like-btn').addClass('checked');
-        } else {
-            $scope.find('.like-btn').removeClass('checked');
-        }
-        if(audioManager.autoplay){
-            $songImg.addClass('move');
-            $songImg.css({transform : 'rotate(0deg)'});
-        }
-
-    }
-
-    //绑定页面事件
-    function addControlEvent () {
-        //播放暂停
-        $scope.find('.play-btn').on('click', function () {
-            let $this = $(this);
-            if($this.hasClass('playing')){
+    function addControlEvent() {
+        $playBtn.on('click', function () {
+            if ($(this).hasClass('playing')) {
                 audioManager.pause();
                 cancelAnimationFrame(frameId);
-
-                $songImg.css({animationPlayState : 'paused'});
-            }else{
-                audioManager.play();
-                setProgress();
-
-                if($songImg.hasClass('move')){
-                    $songImg.css({animationPlayState : 'running'});
-                }else{
-                    $songImg.addClass('move')
-                }
-            }
-            $this.toggleClass('playing');
-        });
-        //上一首
-        $scope.find('.prev-btn').on('click',function () {
-            audioManager.playPrev();
-            $scope.trigger('changeAudio');
-        });
-        //下一首
-        $scope.find('.next-btn').on('click',function () {
-            audioManager.playNext();
-            $scope.trigger('changeAudio');
-        });
-        //收藏
-        $scope.find('.like-btn').on('click',function () {
-            let index = audioManager.index;
-            console.log(likeList[index]);
-            if (likeList[index]) {
-                $('.like-btn').removeClass('checked');
-                likeList[index] = false;
             } else {
-                $('.like-btn').addClass('checked');
+                audioManager.play();
+                setProcess();
+            }
+            $(this).toggleClass('playing');
+        });
+        $('.next-btn').on('click', function () {
+            audioManager.playNext();
+        });
+        $('.prev-btn').on('click', function () {
+            audioManager.playPrev();
+        });
+        $('.like-btn').on('click', function () {
+            let index = audioManager.index;
+
+            if (likeList[index]) {
+                $('.like-btn').removeClass('disabled');
+                 likeList[index] = false;
+
+            } else {
+                $('.like-btn').addClass('disabled');
                 likeList[index] = true;
             }
         });
     }
 
-    //进度条移动
-    function setProtopTranslate (percent) {
-        let value;
-        if(percent !== 0){
-            value = percent + '%'
+    function formatTime(during) {
+        let minute = Math.floor(during / 60),
+            second = during - minute * 60;
+
+        if (minute < 10) {
+            minute = '0' + minute;
         }
+        if (second < 10) {
+            second = '0' + second;
+        }
+
+        return minute + ':' + second;
+    }
+
+    function setProTopTranslate(translatePercent) {
+        let val = translatePercent;
+
+        if (translatePercent != 0) {
+            val = translatePercent + '%';
+        }
+
+
         $proTop.css({
-            transform: 'translateX('+value+')',
-            '-webkit-transform': 'translateX('+value+')'
-        })
+            transform: 'translateX(' + val + ')',
+            '-webkit-transform': 'translateX(' + val + ')'
+        });
     }
 
-    //播放进度条
-    function setProgress () {
+    function setProcess() {
+        cancelAnimationFrame(frameId); 
+
         let frame = function () {
-            let ratio = audioManager.getPlayRatio();
-            let transparentPercent = (ratio - 1) * 100;
-            let time = formatTime(audioManager.getCurrentTime());
-            $curTime.text(time);
-            if(ratio <= 1){
-                setProtopTranslate(transparentPercent);
-                frameId = requestAnimationFrame(frame)
-            }else{
-                setProtopTranslate(0);
-                cancelAnimationFrame(frameId);
-            }
-        };
-        frame()
+                let playRatio = audioManager.getPlayRation(),
+                    translatePercent = (playRatio - 1) * 100,
+                    time = formatTime(audioManager.getCurTime());
+
+                $timeCur.text(time);
+
+                if (translatePercent <= 1) {
+                    setProTopTranslate(translatePercent);
+                    frameId = requestAnimationFrame(frame);
+                } else {
+                    setProTopTranslate(0);
+                    cancelAnimationFrame(frameId);
+                }
+            };
+        frame();
     }
 
-    //重置进度条
-    function resetProgess () {
-        setProtopTranslate(-100);
-        $curTime.text('00:00');
+    function resetProcess() {
+        setProTopTranslate(-100);
+
+        $timeCur.text('00:00');
     }
 
-    //拖拽进度条小球
-    function bindProgressEvent () {
-        let $slidePoint = $scope.find('.slide-point'),
-            offset = $scope.find('.pro-wrap').offset(),
-            offsetX = offset.left,
-            width = $scope.find('.pro-wrap').width();
+    function renderPage() {
+        let curData = audioManager.getCurInfo(),
+            setImage = function (src) {
+                let img = new Image();
 
-        $slidePoint.on('touchstart', function (e) {
+                $(img).on('load', function () {
+                    $songImg.attr('src', src);
+                    blurImg(this, $('.content-wrap'));
+                });
+
+                img.src = src;
+            };
+
+        renderInfo(curData);
+        setImage(curData.image);
+        $timeDuration.text(formatTime(audioManager.getDurationTime()));
+        if (likeList[audioManager.index]) {
+            $likeBtn.addClass('disabled');
+        } else {
+            $likeBtn.removeClass('disabled');
+        }
+    }
+
+    function renderInfo(info) {
+        let html = '<h1 class="song-name">' + info.song + '</h1>' +
+            '<h3 class="singer-name">' + info.singer + '</h3>' +
+            '<h3 class="album-name">' + info.album + '</h3>' +
+            '<h3 class="rhythm">' + info.rhythm + '</h3>' +
+            '<h3 class="lyric">' + info.lyric + '</h3>';
+
+
+        $songInfo.html(html);
+    }
+
+    function addProcessEvent() {
+        let $slidePoint = $('.slide-point'),
+            $proTop = $('.pro-top'),
+            offsetX = $('.pro-wrap').offset().left,
+            width = $('.pro-wrap').width();
+
+        $slidePoint.on('touchstart', function () {
             cancelAnimationFrame(frameId);
         }).on('touchmove', function (e) {
+            let x = e.changedTouches[0].clientX - offsetX,
+                ration = x / width,
+                translatePercent = (ration - 1) * 100,
+                time = formatTime(audioManager.getCurTime(ration));
 
-            let X = e.changedTouches[0].clientX - offsetX,
-                ratio = X / width,
-                translatePercent = (ratio - 1) * 100,
-                time = formatTime(audioManager.getCurrentTime(ratio));
-
-            if(ratio > 1 || ratio < 0){
+            if (ration > 1||ration < 0) {
                 return false;
             }
 
-            $curTime.text(time);
-            setProtopTranslate(translatePercent);
+            $timeCur.text(time);
 
+            $proTop.css({
+                transform: 'translateX(' + translatePercent + '%)',
+                '-webkit-transform': 'translateX(' + translatePercent + '%)'
+            });
+
+            return false;
         }).on('touchend', function (e) {
-
             let ratio = (e.changedTouches[0].clientX - offsetX) / width;
+
             audioManager.jumpToPlay(ratio);
-            setProgress();
-            $scope.find('.play-btn').addClass('playing');
-        })
+            $playBtn.addClass('playing');
+            setProcess();
+        });
     }
 
-    //管理仓库
-    function init () {
+    let init = function () {
         renderPage();
         addControlEvent();
-        bindProgressEvent();
+        addProcessEvent();
         $scope.on('changeAudio', function () {
+            $loadingLayer.show();
             renderPage();
-            audioManager.autoplay ? setProgress() :resetProgess();
-        })
-    }
+
+            if (audioManager.autoPlay) {
+                setProcess();
+            } else {
+                resetProcess();
+            }
+        });
+    };
 
     return {
         init: init
     }
-}());
+})();
 
+/********** controlManager End ********/
 
 let audioManager;
-
-function success (d) {
+let success = function (d) {
     audioManager = new AudioManager(d);
+
     controlManager.init();
     playList.init(d);
-}
+};
 
-function getData (url,cb){
+function getData(url, cb) {
     $.ajax({
-        url : url,
-        type : 'GET',
-        success : cb,
-        error : () => {
-            alert('出错了');
+        url: url,
+        type: 'GET',
+        success: cb,
+        error: function () {
+            alert('deal wrong');
         }
     })
 }
 
-getData(dataUrl,success);
+getData(dataUrl, success);
+
+/********** END *********/
 
 let playList = (function () {
 
@@ -331,7 +324,7 @@ let playList = (function () {
         for (let len = data.length, i = 0; i < len; i++) {
             let cur = data[i];
 
-            html += '<li data-index="' + i + '"><h3>' + cur.song + '<span> - ' + cur.singer + '</span></h3></li>';
+            html += '<li data-index="' + i + '"><h4>' + cur.song + '<span> - ' + cur.singer + '</span></h4></li>';
         }
 
         $container.html(html);
@@ -373,7 +366,6 @@ let playList = (function () {
         $playList.on('click', 'li', function () {
             let self = $(this),
                 index = self.data('index');
-            console.log(index);
 
             self.siblings('.playing').removeClass('playing');
             self.addClass('playing');

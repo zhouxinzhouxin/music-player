@@ -48,39 +48,29 @@
 
 	__webpack_require__(2);
 
-	//数据接口
 	var dataUrl = './data/data.json';
-
-	//作用域
 	var $scope = $(document.body);
+	var $loadingLayer = $('.loading-layer');
 
-	var AudioManager = function AudioManager(audioData) {
-	    //绑定数据
-	    this.dataList = audioData;
-	    //索引
+	/********** AudioManager ********/
+	var AudioManager = function AudioManager(dataList) {
+	    this.dataList = dataList;
 	    this.index = 0;
-
-	    this.len = audioData.length;
-
+	    this.len = dataList.length;
 	    this.audio = new Audio();
-
 	    this.audio.preload = 'auto';
-
-	    this.duration = audioData[0].duration;
-
+	    this.duration = dataList[0].duration;
 	    this.setAudio();
-
-	    this.autoplay = false;
+	    this.bindAudioEvent();
+	    this.autoPlay = false;
 	};
 
 	AudioManager.prototype = {
 	    playNext: function playNext() {
 	        this.index++;
-
 	        if (this.index === this.len) {
 	            this.index = 0;
 	        }
-
 	        this.setAudio();
 	    },
 	    playPrev: function playPrev() {
@@ -89,45 +79,45 @@
 	        if (this.index === -1) {
 	            this.index = this.len - 1;
 	        }
-
 	        this.setAudio();
 	    },
 	    playIndex: function playIndex(index) {
 	        this.index = index;
-
-	        this.autoplay = true;
+	        this.autoPlay = true;
 
 	        this.setAudio();
 	    },
-	    setAudio: function setAudio() {
+	    getCurInfo: function getCurInfo() {
+	        return this.dataList[this.index];
+	    },
+	    bindAudioEvent: function bindAudioEvent() {
+	        var _self = this;
 
+	        $(this.audio).on('ended', function () {
+	            _self.playNext();
+	        }).on('canplaythrough', function () {
+	            $loadingLayer.hide();
+	        });
+	    },
+	    setAudio: function setAudio() {
 	        var data = this.dataList[this.index];
 
 	        this.duration = data.duration;
 	        this.audio.src = data.audio;
 	        this.audio.load();
 
-	        if (this.autoplay) {
+	        if (this.autoPlay) {
 	            this.play();
 	        }
+
 	        $scope.trigger('changeAudio');
 	    },
-	    play: function play() {
-	        this.autoplay = true;
-	        this.audio.play();
+	    getDurationTime: function getDurationTime() {
+	        return this.duration;
 	    },
-	    pause: function pause() {
-	        this.autoplay = false;
-	        this.audio.pause();
-	    },
-	    getCurrentInfo: function getCurrentInfo() {
-	        return this.dataList[this.index];
-	    },
-	    getPlayRatio: function getPlayRatio() {
-	        return this.audio.currentTime / this.duration;
-	    },
-	    getCurrentTime: function getCurrentTime(ratio) {
+	    getCurTime: function getCurTime(ratio) {
 	        var curTime = void 0;
+
 	        if (ratio) {
 	            curTime = ratio * this.duration;
 	        } else {
@@ -138,213 +128,216 @@
 	    },
 	    jumpToPlay: function jumpToPlay(ratio) {
 
-	        var time = ratio * this.duration;
-	        console.log(time);
+	        var audioTime = ratio * this.duration;
 
-	        this.audio.currentTime = time;
-	        console.log(this.audio.currentTime);
-	        this.play();
+	        this.audio.currentTime = audioTime;
+
+	        this.audio.play();
+	    },
+	    getPlayRation: function getPlayRation() {
+	        return this.audio.currentTime / this.duration;
+	    },
+	    play: function play() {
+	        this.autoPlay = true;
+	        this.audio.play();
+	    },
+	    pause: function pause() {
+	        this.autoPlay = false;
+	        this.audio.pause();
 	    }
 	};
+	/********** AudioManager End ********/
 
+	/********** controlManager Start ********/
 	var controlManager = function () {
-	    var $songImg = $scope.find('.song-img img');
-	    var $songInfo = $scope.find('.song-info');
-	    var $songDuration = $scope.find('.all-time');
-	    var $curTime = $scope.find('.cur-time');
-	    var $proTop = $scope.find('.pro-top');
-	    var likeList = [false, false, false, false, false];
-	    var frameId = void 0;
+	    var $songImg = $scope.find('.song-img img'),
+	        $songInfo = $scope.find('.song-info'),
+	        $likeBtn = $scope.find('.like-btn'),
+	        $playBtn = $scope.find('.play-btn'),
+	        $timeCur = $scope.find('.cur-time'),
+	        $timeDuration = $scope.find('.all-time'),
+	        $proTop = $scope.find('.pro-top'),
+	        likeList = [false, false, false, false, false],
+	        frameId = void 0;
 
-	    //渲染背景图
-	    function setImageBg(img) {
-	        $songImg.attr('src', img.src);
-	        blurImg(img, $scope.find('.content-wrapper'));
-	    }
-
-	    //渲染歌曲信息
-	    function renderInfo(info) {
-	        var html = '<h1 class="song-name">' + info.song + '</h1>\n                    <h3 class="singer-name">' + info.singer + '</h3>\n                    <h3 class="album">' + info.album + '</h3>\n                    <h3 class="rhythm">' + info.rhythm + '</h3>\n                    <h3 class="Lyric">' + info.lyric + '</h3>';
-	        $songInfo.html(html);
-	    }
-
-	    //渲染时间
-	    function formatTime(duration) {
-	        var minute = Math.floor(duration / 60);
-	        var second = duration - minute * 60;
-	        minute < 10 ? minute = '0' + minute : minute;
-	        second < 10 ? second = '0' + second : second;
-	        return minute + ':' + second;
-	    }
-
-	    //渲染页面
-	    function renderPage() {
-	        var curInfo = audioManager.getCurrentInfo();
-
-	        //图片信息
-	        var img = new Image();
-	        img.onload = function () {
-	            setImageBg(this);
-	        };
-	        img.src = curInfo.image;
-	        //重置图片旋转
-	        $songImg.removeClass('move');
-	        $songImg.css({ animationPlayState: '', transform: '' });
-
-	        //歌曲信息
-	        renderInfo(curInfo);
-
-	        //渲染时间
-	        $songDuration.text(formatTime(curInfo.duration));
-
-	        //收藏按钮
-	        if (likeList[audioManager.index]) {
-	            $scope.find('.like-btn').addClass('checked');
-	        } else {
-	            $scope.find('.like-btn').removeClass('checked');
-	        }
-	        if (audioManager.autoplay) {
-	            $songImg.addClass('move');
-	            $songImg.css({ transform: 'rotate(0deg)' });
-	        }
-	    }
-
-	    //绑定页面事件
 	    function addControlEvent() {
-	        //播放暂停
-	        $scope.find('.play-btn').on('click', function () {
-	            var $this = $(this);
-	            if ($this.hasClass('playing')) {
+	        $playBtn.on('click', function () {
+	            if ($(this).hasClass('playing')) {
 	                audioManager.pause();
 	                cancelAnimationFrame(frameId);
-
-	                $songImg.css({ animationPlayState: 'paused' });
 	            } else {
 	                audioManager.play();
-	                setProgress();
-
-	                if ($songImg.hasClass('move')) {
-	                    $songImg.css({ animationPlayState: 'running' });
-	                } else {
-	                    $songImg.addClass('move');
-	                }
+	                setProcess();
 	            }
-	            $this.toggleClass('playing');
+	            $(this).toggleClass('playing');
 	        });
-	        //上一首
-	        $scope.find('.prev-btn').on('click', function () {
-	            audioManager.playPrev();
-	            $scope.trigger('changeAudio');
-	        });
-	        //下一首
-	        $scope.find('.next-btn').on('click', function () {
+	        $('.next-btn').on('click', function () {
 	            audioManager.playNext();
-	            $scope.trigger('changeAudio');
 	        });
-	        //收藏
-	        $scope.find('.like-btn').on('click', function () {
+	        $('.prev-btn').on('click', function () {
+	            audioManager.playPrev();
+	        });
+	        $('.like-btn').on('click', function () {
 	            var index = audioManager.index;
-	            console.log(likeList[index]);
+
 	            if (likeList[index]) {
-	                $('.like-btn').removeClass('checked');
+	                $('.like-btn').removeClass('disabled');
 	                likeList[index] = false;
 	            } else {
-	                $('.like-btn').addClass('checked');
+	                $('.like-btn').addClass('disabled');
 	                likeList[index] = true;
 	            }
 	        });
 	    }
 
-	    //进度条移动
-	    function setProtopTranslate(percent) {
-	        var value = void 0;
-	        if (percent !== 0) {
-	            value = percent + '%';
+	    function formatTime(during) {
+	        var minute = Math.floor(during / 60),
+	            second = during - minute * 60;
+
+	        if (minute < 10) {
+	            minute = '0' + minute;
 	        }
+	        if (second < 10) {
+	            second = '0' + second;
+	        }
+
+	        return minute + ':' + second;
+	    }
+
+	    function setProTopTranslate(translatePercent) {
+	        var val = translatePercent;
+
+	        if (translatePercent != 0) {
+	            val = translatePercent + '%';
+	        }
+
 	        $proTop.css({
-	            transform: 'translateX(' + value + ')',
-	            '-webkit-transform': 'translateX(' + value + ')'
+	            transform: 'translateX(' + val + ')',
+	            '-webkit-transform': 'translateX(' + val + ')'
 	        });
 	    }
 
-	    //播放进度条
-	    function setProgress() {
+	    function setProcess() {
+	        cancelAnimationFrame(frameId);
+
 	        var frame = function frame() {
-	            var ratio = audioManager.getPlayRatio();
-	            var transparentPercent = (ratio - 1) * 100;
-	            var time = formatTime(audioManager.getCurrentTime());
-	            $curTime.text(time);
-	            if (ratio <= 1) {
-	                setProtopTranslate(transparentPercent);
+	            var playRatio = audioManager.getPlayRation(),
+	                translatePercent = (playRatio - 1) * 100,
+	                time = formatTime(audioManager.getCurTime());
+
+	            $timeCur.text(time);
+
+	            if (translatePercent <= 1) {
+	                setProTopTranslate(translatePercent);
 	                frameId = requestAnimationFrame(frame);
 	            } else {
-	                setProtopTranslate(0);
+	                setProTopTranslate(0);
 	                cancelAnimationFrame(frameId);
 	            }
 	        };
 	        frame();
 	    }
 
-	    //重置进度条
-	    function resetProgess() {
-	        setProtopTranslate(-100);
-	        $curTime.text('00:00');
+	    function resetProcess() {
+	        setProTopTranslate(-100);
+
+	        $timeCur.text('00:00');
 	    }
 
-	    //拖拽进度条小球
-	    function bindProgressEvent() {
-	        var $slidePoint = $scope.find('.slide-point'),
-	            offset = $scope.find('.pro-wrap').offset(),
-	            offsetX = offset.left,
-	            width = $scope.find('.pro-wrap').width();
+	    function renderPage() {
+	        var curData = audioManager.getCurInfo(),
+	            setImage = function setImage(src) {
+	            var img = new Image();
 
-	        $slidePoint.on('touchstart', function (e) {
+	            $(img).on('load', function () {
+	                $songImg.attr('src', src);
+	                blurImg(this, $('.content-wrap'));
+	            });
+
+	            img.src = src;
+	        };
+
+	        renderInfo(curData);
+	        setImage(curData.image);
+	        $timeDuration.text(formatTime(audioManager.getDurationTime()));
+	        if (likeList[audioManager.index]) {
+	            $likeBtn.addClass('disabled');
+	        } else {
+	            $likeBtn.removeClass('disabled');
+	        }
+	    }
+
+	    function renderInfo(info) {
+	        var html = '<h1 class="song-name">' + info.song + '</h1>' + '<h3 class="singer-name">' + info.singer + '</h3>' + '<h3 class="album-name">' + info.album + '</h3>' + '<h3 class="rhythm">' + info.rhythm + '</h3>' + '<h3 class="lyric">' + info.lyric + '</h3>';
+
+	        $songInfo.html(html);
+	    }
+
+	    function addProcessEvent() {
+	        var $slidePoint = $('.slide-point'),
+	            $proTop = $('.pro-top'),
+	            offsetX = $('.pro-wrap').offset().left,
+	            width = $('.pro-wrap').width();
+
+	        $slidePoint.on('touchstart', function () {
 	            cancelAnimationFrame(frameId);
 	        }).on('touchmove', function (e) {
+	            var x = e.changedTouches[0].clientX - offsetX,
+	                ration = x / width,
+	                translatePercent = (ration - 1) * 100,
+	                time = formatTime(audioManager.getCurTime(ration));
 
-	            var X = e.changedTouches[0].clientX - offsetX,
-	                ratio = X / width,
-	                translatePercent = (ratio - 1) * 100,
-	                time = formatTime(audioManager.getCurrentTime(ratio));
-
-	            if (ratio > 1 || ratio < 0) {
+	            if (ration > 1 || ration < 0) {
 	                return false;
 	            }
 
-	            $curTime.text(time);
-	            setProtopTranslate(translatePercent);
-	        }).on('touchend', function (e) {
+	            $timeCur.text(time);
 
+	            $proTop.css({
+	                transform: 'translateX(' + translatePercent + '%)',
+	                '-webkit-transform': 'translateX(' + translatePercent + '%)'
+	            });
+
+	            return false;
+	        }).on('touchend', function (e) {
 	            var ratio = (e.changedTouches[0].clientX - offsetX) / width;
+
 	            audioManager.jumpToPlay(ratio);
-	            setProgress();
-	            $scope.find('.play-btn').addClass('playing');
+	            $playBtn.addClass('playing');
+	            setProcess();
 	        });
 	    }
 
-	    //管理仓库
-	    function init() {
+	    var init = function init() {
 	        renderPage();
 	        addControlEvent();
-	        bindProgressEvent();
+	        addProcessEvent();
 	        $scope.on('changeAudio', function () {
+	            $loadingLayer.show();
 	            renderPage();
-	            audioManager.autoplay ? setProgress() : resetProgess();
+
+	            if (audioManager.autoPlay) {
+	                setProcess();
+	            } else {
+	                resetProcess();
+	            }
 	        });
-	    }
+	    };
 
 	    return {
 	        init: init
 	    };
 	}();
 
-	var audioManager = void 0;
+	/********** controlManager End ********/
 
-	function success(d) {
+	var audioManager = void 0;
+	var success = function success(d) {
 	    audioManager = new AudioManager(d);
+
 	    controlManager.init();
 	    playList.init(d);
-	}
+	};
 
 	function getData(url, cb) {
 	    $.ajax({
@@ -352,12 +345,14 @@
 	        type: 'GET',
 	        success: cb,
 	        error: function error() {
-	            alert('出错了');
+	            alert('deal wrong');
 	        }
 	    });
 	}
 
 	getData(dataUrl, success);
+
+	/********** END *********/
 
 	var playList = function () {
 
@@ -370,7 +365,7 @@
 	        for (var len = data.length, i = 0; i < len; i++) {
 	            var cur = data[i];
 
-	            html += '<li data-index="' + i + '"><h3>' + cur.song + '<span> - ' + cur.singer + '</span></h3></li>';
+	            html += '<li data-index="' + i + '"><h4>' + cur.song + '<span> - ' + cur.singer + '</span></h4></li>';
 	        }
 
 	        $container.html(html);
@@ -412,7 +407,6 @@
 	        $playList.on('click', 'li', function () {
 	            var self = $(this),
 	                index = self.data('index');
-	            console.log(index);
 
 	            self.siblings('.playing').removeClass('playing');
 	            self.addClass('playing');
@@ -10672,7 +10666,7 @@
 	var content = __webpack_require__(3);
 	if(typeof content === 'string') content = [[module.id, content, '']];
 	// add the styles to the DOM
-	var update = __webpack_require__(12)(content, {});
+	var update = __webpack_require__(5)(content, {});
 	if(content.locals) module.exports = content.locals;
 	// Hot Module Replacement
 	if(false) {
@@ -10697,7 +10691,7 @@
 
 
 	// module
-	exports.push([module.id, "p,\nh1,\nh2,\nh3,\nh4,\nh5,\nh6 {\n  margin: 0;\n}\nul,\nli {\n  margin: 0;\n  padding: 0;\n  list-style: none;\n}\nhtml,\nbody {\n  margin: 0;\n  padding: 0;\n  position: absolute;\n  top: 0;\n  left: 0;\n  bottom: 0;\n  right: 0;\n  background-color: #fff;\n  overflow: hidden;\n  font: 14px/20px Helvetica, sans-serif, arial;\n}\n.content-wrapper {\n  width: 100%;\n  height: 100%;\n  max-width: 600px;\n  margin: 0 auto;\n  -webkit-background-size: cover;\n  background-size: cover;\n  background-repeat: no-repeat;\n  background-position: 50%;\n}\n.content {\n  position: relative;\n  width: 100%;\n  height: 100%;\n  padding-top: 60px;\n  box-sizing: border-box;\n  background: rgba(0, 0, 0, 0.6);\n}\n.song-img {\n  position: relative;\n  height: 0;\n  width: 50%;\n  padding-bottom: 50%;\n  margin: 0 auto 30px;\n}\n.song-img .img-wrap {\n  position: absolute;\n  top: 0;\n  left: 0;\n  bottom: 0;\n  right: 0;\n}\n.song-img .img-wrap img {\n  display: block;\n  width: 100%;\n  height: 100%;\n  border-radius: 50%;\n}\n.song-img .img-wrap .move {\n  -webkit-animation: move 15s infinite linear;\n  -o-animation: move 15s infinite linear;\n  animation: move 15s infinite linear;\n}\n.song-info {\n  text-align: center;\n}\n.song-info h1 {\n  font-size: 24px;\n  line-height: 36px;\n  color: #fff;\n  font-weight: 400;\n  overflow: hidden;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n  margin-bottom: 8px;\n}\n.song-info h3 {\n  color: rgba(255, 255, 255, 0.6);\n  margin-bottom: 6px;\n  font-size: 12px;\n  line-height: 16px;\n}\n.play-area {\n  height: 40px;\n  line-height: 40px;\n  width: 100%;\n  display: -webkit-flex;\n  display: -ms-flexbox;\n  display: flex;\n}\n.play-area .all-time,\n.play-area .cur-time {\n  width: 60px;\n  display: block;\n  text-align: center;\n  color: rgba(255, 255, 255, 0.86);\n}\n.play-area .pro-wrap {\n  -webkit-flex: 1;\n  -ms-flex: 1;\n  flex: 1;\n  position: relative;\n  overflow: hidden;\n  padding-left: 3px;\n}\n.play-area .pro-wrap .pro-bottom {\n  width: 100%;\n  height: 1px;\n  position: relative;\n  top: 20px;\n  background-color: rgba(255, 255, 255, 0.6);\n}\n.play-area .pro-wrap .pro-top {\n  height: 1px;\n  background-color: #fff;\n  z-index: 100;\n  -webkit-transform: translateX(-100%);\n  -ms-transform: translateX(-100%);\n  transform: translateX(-100%);\n}\n.play-area .pro-wrap .pro-top .slide-point {\n  position: absolute;\n  width: 21px;\n  height: 21px;\n  right: -10px;\n  top: -10px;\n}\n.play-area .pro-wrap .pro-top .slide-point::after {\n  content: '';\n  position: absolute;\n  width: 5px;\n  height: 5px;\n  border-radius: 50%;\n  background-color: #fff;\n  top: 8px;\n  left: 8px;\n}\n.play-control {\n  position: absolute;\n  bottom: 0;\n  width: 100%;\n  height: 60px;\n  display: flex;\n  background-color: rgba(0, 0, 0, 0.2);\n}\n.play-control .btn-wrap {\n  flex: 1;\n  display: flex;\n  justify-content: center;\n  align-items: center;\n}\n.play-control .btn-wrap span {\n  display: block;\n  width: 20px;\n  height: 20px;\n  background-position: 50%;\n  background-repeat: no-repeat;\n  background-size: cover;\n}\n.play-control .btn-wrap .like-btn {\n  background-image: url(" + __webpack_require__(5) + ");\n}\n.play-control .btn-wrap .like-btn.checked {\n  background-image: url(" + __webpack_require__(6) + ");\n}\n.play-control .btn-wrap .prev-btn {\n  background-image: url(" + __webpack_require__(7) + ");\n}\n.play-control .btn-wrap .play-btn {\n  background-image: url(" + __webpack_require__(8) + ");\n}\n.play-control .btn-wrap .play-btn.playing {\n  background-image: url(" + __webpack_require__(9) + ");\n}\n.play-control .btn-wrap .next-btn {\n  background-image: url(" + __webpack_require__(10) + ");\n}\n.play-control .btn-wrap .list-btn {\n  background-image: url(" + __webpack_require__(11) + ");\n}\n.play-list {\n  width: 100%;\n  height: 216px;\n  background: #fff;\n  z-index: 1000;\n  bottom: -216px;\n  position: absolute;\n}\n.play-list div {\n  height: 30px;\n  line-height: 30px;\n  font-size: 25px;\n  border-bottom: 1px solid gray;\n  border-radius: 5px;\n  text-align: center;\n}\n.play-list ul li {\n  width: 100%;\n  height: 30px;\n  line-height: 30px;\n  font-size: 19px;\n  border-bottom: 1px solid gray;\n  border-radius: 5px;\n  text-align: center;\n}\n.play-list .playing {\n  color: red;\n}\n.show {\n  -webkit-animation: cube 0.5s  ease;\n  animation: cube 0.5s  ease;\n  -webkit-animation-fill-mode: forwards;\n  animation-fill-mode: forwards;\n}\n.hide {\n  -webkit-animation: returnCube 0.5s  ease;\n  animation: returnCube 0.5s  ease;\n  -webkit-animation-fill-mode: forwards;\n  animation-fill-mode: forwards;\n}\n@-webkit-keyframes cube {\n  0% {\n    bottom: -216px;\n  }\n  100% {\n    bottom: 0;\n  }\n}\n@keyframes cube {\n  0% {\n    bottom: -216px;\n  }\n  100% {\n    bottom: 0;\n  }\n}\n@-webkit-keyframes returnCube {\n  0% {\n    bottom: 0;\n  }\n  100% {\n    bottom: -216px;\n  }\n}\n@keyframes returnCube {\n  0% {\n    bottom: 0;\n  }\n  100% {\n    bottom: -216px;\n  }\n}\n@keyframes move {\n  0% {\n    transform: rotate(0deg);\n  }\n  100% {\n    transform: rotate(360deg);\n  }\n}\n", ""]);
+	exports.push([module.id, "p,\nh1,\nh2,\nh3,\nh4,\nh5,\nh6 {\n  margin: 0;\n}\nul,\nli {\n  list-style: none;\n  padding: 0;\n  margin: 0;\n}\nhtml,\nbody {\n  position: absolute;\n  top: 0;\n  bottom: 0;\n  right: 0;\n  left: 0;\n  overflow: hidden;\n  background-color: #fff;\n  margin: 0;\n  padding: 0;\n  font: 14px/20px Helvetica, sans-serif, arial;\n}\n.content-wrap {\n  width: 100%;\n  height: 100%;\n  max-width: 600px;\n  margin: 0 auto;\n  background-size: cover;\n  background-repeat: no-repeat;\n  background-position: 50%;\n}\n.content {\n  width: 100%;\n  height: 100%;\n  padding-top: 60px;\n  box-sizing: border-box;\n  background-color: rgba(0, 0, 0, 0.6);\n  position: relative;\n}\n.song-img {\n  position: relative;\n  width: 50%;\n  height: 0;\n  padding-bottom: 50%;\n  margin: 0 auto 30px;\n}\n.song-img .img-wrap {\n  position: absolute;\n  top: 0;\n  bottom: 0;\n  right: 0;\n  left: 0;\n}\n.song-img .img-wrap img {\n  display: block;\n  width: 100%;\n  height: 100%;\n  border: none;\n}\n.song-info {\n  text-align: center;\n}\n.song-info h1 {\n  font-size: 24px;\n  line-height: 36px;\n  color: #fff;\n  font-weight: lighter;\n  overflow: hidden;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n  margin-bottom: 8px;\n}\n.song-info h3 {\n  color: rgba(255, 255, 255, 0.6);\n  margin-bottom: 6px;\n  font-size: 12px;\n  line-height: 16px;\n}\n.play-area {\n  height: 40px;\n  line-height: 40px;\n  width: 100%;\n  display: -webkit-flex;\n  display: -ms-flexbox;\n  display: flex;\n}\n.play-area .all-time,\n.play-area .cur-time {\n  width: 60px;\n  display: block;\n  text-align: center;\n  color: rgba(255, 255, 255, 0.86);\n}\n.play-area .pro-wrap {\n  -webkit-flex: 1;\n  -ms-flex: 1;\n  flex: 1;\n  position: relative;\n  overflow: hidden;\n  padding-left: 3px;\n}\n.play-area .pro-wrap .pro-bottom {\n  width: 100%;\n  height: 1px;\n  position: relative;\n  top: 20px;\n  background-color: rgba(255, 255, 255, 0.6);\n}\n.play-area .pro-wrap .pro-top {\n  height: 1px;\n  background-color: #fff;\n  z-index: 100;\n  -webkit-transform: translateX(-100%);\n  -ms-transform: translateX(-100%);\n  transform: translateX(-100%);\n}\n.play-area .pro-wrap .pro-top .slide-point {\n  position: absolute;\n  width: 21px;\n  height: 21px;\n  right: -10px;\n  top: -10px;\n  bottom: 0;\n}\n.play-area .pro-wrap .pro-top .slide-point::after {\n  content: '';\n  position: absolute;\n  width: 5px;\n  height: 5px;\n  border-radius: 50%;\n  background-color: #fff;\n  top: 8px;\n  left: 8px;\n}\n.play-control {\n  position: absolute;\n  bottom: 0;\n  width: 100%;\n  height: 60px;\n  background-color: rgba(0, 0, 0, 0.2);\n  display: -webkit-flex;\n  display: -ms-flexbox;\n  display: flex;\n}\n.play-control .btn-wrap {\n  -webkit-flex: 1;\n  -ms-flex: 1;\n  flex: 1;\n  display: -webkit-flex;\n  display: -ms-flexbox;\n  display: flex;\n  -webkit-justify-content: center;\n  -ms-flex-pack: center;\n  justify-content: center;\n  -webkit-align-items: center;\n  -ms-flex-align: center;\n  align-items: center;\n}\n.play-control .btn-wrap span {\n  display: block;\n  width: 20px;\n  height: 20px;\n  background-size: cover;\n  background-repeat: no-repeat;\n  background-position: 50%;\n}\n.play-control .btn-wrap .like-btn {\n  background-image: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAQAAAAAYLlVAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAAAmJLR0QAAKqNIzIAAAAJcEhZcwAADdcAAA3XAUIom3gAAAAHdElNRQfgCA8PNAuVJ4f3AAAEnElEQVRo3uXZW4hVVRzH8f85ppmNlaBE5nRx7DpNCSNEF8gukhZ0sSjUICiCsujyUuFLURAahdSD9VJgdIFKeim6YCkFkpV0oYtoo5kmk2mmzjQzNud8ejh7nBk958zZe5ozD+3/01lr/X7/79p77bPX/u+cGN0jP8r546iKPbm4MC6Ok2NqnBDboy3aYlN8V+OkZsaMmB5N0Rh7Y2f8FutifVQ61cpFsxftdOTxo3tNFFViskdsLaPc6UXN5RTlLFboTWQF7b621i+Kh6z2W25C2eRTvaL70Liibdb6WrtC0tJrhclDAcy1F/RYZcGA2R6jxSJfJFbfmn5E+sv9nvSusdDMAZATLbBKD9hrbjWA+5O5ryqToBTzfA7+dM2A1pwlifI9F1dQTrcqOQ/3VwJ4HPxlXtWrHO7Qi4KbD7W8BHa7ZAjlPPvA4+UAblLEVucOYRLCjbqx35lCWAy2O6cGZYtfUXTT4QDn6cAu02owCWGODnznGBc5iI1OqVF5mt3ocN5ggM/Q64oaTUJYBN70G/aZmkJ5pV58NhDgevBECpM+6NLxQEplabVd3wcwxk9od2xKm5nJHf6NMSmVE+zET8aUAK4G96Q0CWEFihVvvGpxF7i6BLASe43LYHOyf7yfQRfG2oOVIoy3Dy9lsglvuTaj8mXsMz7MBVdltGmWz6i8BszNxwURUYhPMz7Of4hiRuWaKEbEBfloiYi2OPjfbC9SHF3RFhEtJYAf654+IuL7EsC0iNg0KgCbI2JaPhoi4sCoAByIiIZ8dEXEpFEBmBQRXfn4OSJmjArAjIj4uQTQNCoATSWAzRHRFLm6p89FU0RsLgGMj+a6AzTH+BLA6hARN9Qd4IaIEKtDWIevMv6jZ4+vsE7kI+KdiGiNxrrOvzFak8xCE1ha1/kvBU19e8J30WFK3dJP0YF3RR/ALPB03QCeBrP6AUrnoFNjXdI36uybfz9AqwLWZN7f1B55a1DQOhggLAMPjzjAw2BZ3+/+jnE2oKePbISiVQ829O/BB3aerRPtzhqx9GdpR6ez+9sGD1ioiO1OH5H0p9uOooUDWw8fVHrV3jIC90OjLWDx4PYjBz6avO3XUieoPVrsAI8e3lNu8JNgj4v+s/Sz/VXp/bu84EFFdGZ+7Roct+hGwX3leiuJFjiIf9w+7PSlyXSZX76/snCOAygO668p55mkpnZppTHV5LPsAs/KZUo/zutgW7UFXd3ijOTWedXY1OmP83FS1KxaPxrK5iTfgPdTFnCm+hZ84vjqI4e2Ot5asP7IOm/FOMc28MbQdZda7I5OiqwbnVpT+kvsqX3t1DajvBfAjr7yYpW4UReKHqrtbNV+VR9Lqt2XVh21WAE9bq3VN83CulsBf7uu4oinknL37Npd0wCE+brR684yfWOtTC5TSxrPdADhsuSxsuSw9gYfgB/SPsjTAoTzk69Jzw1Y4yfaAD41Ka1feoBwmk2D7vIztIG3HZ3eLQtAmOJL8JEGF/oDPJ9tS58NIDT4EHyvc3jPzKwAYazXkq8FB92W2WUYACFnOfZnrjMPGyCEB8wcnkPuf//1/F8GuXduvHHldQAAACV0RVh0ZGF0ZTpjcmVhdGUAMjAxNi0wOC0xNVQxNTo1MjoxMSswMjowMMmA4yQAAAAldEVYdGRhdGU6bW9kaWZ5ADIwMTYtMDgtMTVUMTU6NTI6MTErMDI6MDC43VuYAAAAGXRFWHRTb2Z0d2FyZQB3d3cuaW5rc2NhcGUub3Jnm+48GgAAAABJRU5ErkJggg==);\n}\n.play-control .btn-wrap .like-btn.checked {\n  background-image: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAQAAAAAYLlVAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAAAmJLR0QAAKqNIzIAAAAJcEhZcwAADdcAAA3XAUIom3gAAAAHdElNRQfgCA8PNBlmnva/AAAC+UlEQVRo3s2ZPUsjURSGn0ziF4KCZCGRdYlutVauLMJiZaP+AAU7/4CVhWKvIvgP1MZCQcFCwcrCQmRBxLXwAwQV/EBBBRUU3EXfLdxsTMzMZGaS3D3TJTnnee5Ncu+dMyFhNizDfCIO74WpJ0acKNeccMolLzkPK0Ydn4hyzQWXHPNs+1llu6rUoxndKD0etaAulQuHq1xdWtBjRuaNZtSjqmwZ71+q0JBuZR/3mlQ8KzyuSd07ZN5qSBVuAt06l3vcq1+RtLyI+h3hyThXt72ApdEcSiRjR43/Mhu14yFzVFY2gTIteSgiSVdqFkLNuvKYuaSy9wLTHotI0q1a1er4i7GL6UyBQR9FJOlBDz4zB1/JIQG08KPoS9IL39lIroRjBlZEi7HkQtTucxKDR7uwgIGijz4ZAxBSNVeUGBL4zQeLDmN4KKHDotMYHqDTImFUIGERNyoQt4gZFYhZlBoVKLU4MypwZnFqVOD0P5iBY6MCxxbLRgWWQ4JDGgzhj/hsAfPGxj//eiCZMyYw9yqwzaoR/Crb/D0TfmODUJHxooXN5Jlw08DXMMcmJGcAGtgv6q7wiy8cQao/cMR4Ucc//ornzZ1RWGtFOw2vKZzkht60aD7yk2gRRn/N19QO9PaG5IxeCt8yEr1pG2BGf2Ck4NM/4tYhmSgofsK9RWNptmD42betCTsBFNFiQfCLGW0dWwFUppW841dSXRF3AVSp9bzi11WZnWTf8avWVt7wW6q24zg1HaPaywt+T1F7ipMAqtVhYPyhap0YzgIooZNA+BMlnAluAqhOu77xu6pzq+8ugGp8/iPWVeNePRcBVOG5iyotvW9M+xdAYU15wk+ldvz8CCA0nDN+OPeqXgRQn55d4c/q81LTmwDq1pMj/inzeUC+BVCb7mzxd2rzWs+7AGrSRVb8hZq8V/MjgOp18A5/oHo/tfwJoJj20/D7ivmr5FcgXcE3PohASiEAPv3GxHvEWAXauPRfIpgAxCAIPrhA4DD+9PwPbiBDpp9So18AAAAldEVYdGRhdGU6Y3JlYXRlADIwMTYtMDgtMTVUMTU6NTI6MjUrMDI6MDCzQMDUAAAAJXRFWHRkYXRlOm1vZGlmeQAyMDE2LTA4LTE1VDE1OjUyOjI1KzAyOjAwwh14aAAAABl0RVh0U29mdHdhcmUAd3d3Lmlua3NjYXBlLm9yZ5vuPBoAAAAASUVORK5CYII=);\n}\n.play-control .btn-wrap .disabled {\n  background-image: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAQAAAAAYLlVAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAAAmJLR0QAAKqNIzIAAAAJcEhZcwAADdcAAA3XAUIom3gAAAAHdElNRQfgCA8PNBlmnva/AAAC+UlEQVRo3s2ZPUsjURSGn0ziF4KCZCGRdYlutVauLMJiZaP+AAU7/4CVhWKvIvgP1MZCQcFCwcrCQmRBxLXwAwQV/EBBBRUU3EXfLdxsTMzMZGaS3D3TJTnnee5Ncu+dMyFhNizDfCIO74WpJ0acKNeccMolLzkPK0Ydn4hyzQWXHPNs+1llu6rUoxndKD0etaAulQuHq1xdWtBjRuaNZtSjqmwZ71+q0JBuZR/3mlQ8KzyuSd07ZN5qSBVuAt06l3vcq1+RtLyI+h3hyThXt72ApdEcSiRjR43/Mhu14yFzVFY2gTIteSgiSVdqFkLNuvKYuaSy9wLTHotI0q1a1er4i7GL6UyBQR9FJOlBDz4zB1/JIQG08KPoS9IL39lIroRjBlZEi7HkQtTucxKDR7uwgIGijz4ZAxBSNVeUGBL4zQeLDmN4KKHDotMYHqDTImFUIGERNyoQt4gZFYhZlBoVKLU4MypwZnFqVOD0P5iBY6MCxxbLRgWWQ4JDGgzhj/hsAfPGxj//eiCZMyYw9yqwzaoR/Crb/D0TfmODUJHxooXN5Jlw08DXMMcmJGcAGtgv6q7wiy8cQao/cMR4Ucc//ornzZ1RWGtFOw2vKZzkht60aD7yk2gRRn/N19QO9PaG5IxeCt8yEr1pG2BGf2Ck4NM/4tYhmSgofsK9RWNptmD42betCTsBFNFiQfCLGW0dWwFUppW841dSXRF3AVSp9bzi11WZnWTf8avWVt7wW6q24zg1HaPaywt+T1F7ipMAqtVhYPyhap0YzgIooZNA+BMlnAluAqhOu77xu6pzq+8ugGp8/iPWVeNePRcBVOG5iyotvW9M+xdAYU15wk+ldvz8CCA0nDN+OPeqXgRQn55d4c/q81LTmwDq1pMj/inzeUC+BVCb7mzxd2rzWs+7AGrSRVb8hZq8V/MjgOp18A5/oHo/tfwJoJj20/D7ivmr5FcgXcE3PohASiEAPv3GxHvEWAXauPRfIpgAxCAIPrhA4DD+9PwPbiBDpp9So18AAAAldEVYdGRhdGU6Y3JlYXRlADIwMTYtMDgtMTVUMTU6NTI6MjUrMDI6MDCzQMDUAAAAJXRFWHRkYXRlOm1vZGlmeQAyMDE2LTA4LTE1VDE1OjUyOjI1KzAyOjAwwh14aAAAABl0RVh0U29mdHdhcmUAd3d3Lmlua3NjYXBlLm9yZ5vuPBoAAAAASUVORK5CYII=);\n}\n.play-control .btn-wrap .prev-btn {\n  background-image: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAQAAAAAYLlVAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAAAmJLR0QAAKqNIzIAAAAJcEhZcwAADdcAAA3XAUIom3gAAAAHdElNRQfgCA8PLiJnuOVAAAADbUlEQVRo3sXZfWhVZQDH8Y9zrlYzrZFIIcUokNzmWg0zxQVhBEkvtIjC0RQ2SIhBUUpF2Rs4yWJSVlpaTqxo0gwlS7SWiplaa2YI0QgkkIWhYhi+7PTHDjPu9O7e3XOfPeefy3mec75ffufC+Z1zRFK2iuhg1BmNHbQ/121GtCXaEZWm7h+8sDWKoihqSBReFC2JzkVRFEVLU+cKpY5xYLzkRqU2lfHvCamTBQmCLjQKPGPvAP6CC/I5ynRqUYQz9oYXaPSzmeCgadaHFZhok5VK0GeZW/x0sYWFWZw08/Gg95SCPzToTLc0+QTGadMe49eoTI9PPoE7rTEJ9GqycegDkkygWKutMb5DeSb4JBO4VZvJ4IRmH2Z6WDIJFHrR7hj/rcrM8ckkMNlaNeBfz3lTlJ17bmOUJyxRDH5U79dsT5DbJZhkq1bFOOdVt2WPzy2Bud6K752/qbdneCcZbgKl2rXF+BWqhosfbgL3eN9E8Kf5vh4ufHgJlFhpU4z/WEVu+OwTmOkjZeBvC3yaGzzbBIos0Rnjt6hIAp9NAueb3T+e9k4S8MwTKLBwoNntVpUcPrMEyqw1A5yxWItzyeEzEWj0hhJw0FxdScIZ6hKkNrvE8ekTqPPuQLN7zHfJw9MlMF6bz2L8apX5wl88gReMAr0afZEveLoE+vEdyvOLT/cnPGGeB/yVX3z+H05zELjCGp+7eqQE+ovl/X5x78gIvGwdmGCjD4wNL3BMvYccBfN1mxVaANqV2wyu943XXRJagCPmaHISBZ6yX1VoAVhlql1gih88a3RoAXrMsshpjPGaHW4ILUCfFjW6wXRdHg8tAN1qtOjD5Vb40jWhBThtkVo94G4HPBxaAHaaahW4yifWuzK0ACc1meMIeMQBd4UWgM3KbQDX+srbLgstwFF16h0HC3SZFloA1qmwDdxol1eMCS3AYbM1O4XRnve9m0ILEFmuOn4TXm2/J+M2GUwADrndYmdxqWW2uy60AGe9ZLpD4A7dGkILwD7Vlotk2SaTbMWnNJvtMPrb5H2hBWCbioE22WH10G0y+eeC4+rVxW1ynm61oQVgw//a5Pb0bTJfT0apbfLm0AL0t8mdYIo9Hg0vQI9aC+M2WTMSAvRZOtAmMxTov8UeS1DifJukd9BswM/3+6LfB3++/w+wTZDpuv6r2wAAACV0RVh0ZGF0ZTpjcmVhdGUAMjAxNi0wOC0xNVQxNTo0NjozNCswMjowMBH4tEQAAAAldEVYdGRhdGU6bW9kaWZ5ADIwMTYtMDgtMTVUMTU6NDY6MzQrMDI6MDBgpQz4AAAAGXRFWHRTb2Z0d2FyZQB3d3cuaW5rc2NhcGUub3Jnm+48GgAAAABJRU5ErkJggg==);\n}\n.play-control .btn-wrap .play-btn {\n  background-image: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAQAAAAAYLlVAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAAAmJLR0QAAKqNIzIAAAAJcEhZcwAADdcAAA3XAUIom3gAAAAHdElNRQfgCA8PLBSaNBJbAAADfUlEQVRo3sXZe6zXcxzH8cc5uizdcGQNjYWt0e84qiNWRBlzmbJsLIWDXFd/VFNjLptYN7ZC5sTp6CRMTVGkhEqaTlKdmA2NucwYRm5dzvn443x3Rqd+53d+v9/34/397/v7fL/P5+/1/f7x2vcjOOgoCxvD6jCk1fmUjtanZoUQQmgMM0KnGAKlDp7jQKmp6pVLfUqz/Fau3tSsK1IUqLcfncywXt//Q2CJwT4GQ+0wPr4AHxnoUU3optpKvWMLsNcUw30JLrfL6NgCsF65haDMUnV6xhZgj5uM8gMYq8GI2AKwQn/LQR9rzdUltgA/ukqV31Biom0qYwtArXLvgn7e96AOsQX4ynCT/Y0OHrBZv9gCBI8ZaBsYZJuJSuIKwCfOMV0juphrrT6xBdjvPkN8BkZoMC62AHygwnzQ0yJLHRtbgD/d5RLfgtEaXBFbANbIeAH09poFusUW4BdjXOtncIsdhsYWgJdkrAZ9rTdTp9gCfOdSd/oDpe62Nfc2WczG95QKm0Em9zZZ3Mr5ufPc29ImNzgltgCNHnF20iaH2O7W2AKw/V9t8mmrsrfJdFr/XlNcmLTJy+xydWwB2KBcDSjzssWOii3AHjcbmbTJ6zS4KLYAvNrSJk+0xrzWvLQF/tsmJxgTX6CNKUqxzDq9VBsFgicsiS1wpQXJF4dvVHmr9YI0H0F3z1qR4J+XORQ+zQTO95yTwU9ut/Rwy9JJoLM53knwr+t/eHw6CVRY7Azwu8mqsy8udgJHuMeWBL9JRVv4YidwqkXOBfvcb7amti8ppsAdZusKGoy1M7eLivUIjveG+bqiySyDcsUXK4FrzHcM2O0G77Xn0sITONoSLyb4Z5zZPnzhCVysxgnge+OtbP8NCkngSE96M8Evk8kHX0gCg9U5Dfxqgrp8b5NfAh09ZFOCXyeTPz6/BE5XZwD4yzSPC/nj259AiUk+TPBbDTCvMHx7EzhJrQvAAQ+b7kBh8PYK3GiuHuBT16svHE7uj6CXVyzUA8E8A4qFzzWBkaqTavW1KuuKBc8tge5qLE/wi2WKi287gWFqW5rdbZYVF95WAp3N8XaCX6V/GvhsCZylrqXZTbIgDTgOsXNaG0IIYUvYF5pnY+gbd+e0eSp1xD7TDLM7tX8v+0u407jcq1W+0zqB5g8KTWaqTB/vEO9AWfgibI23ff8P9RjT3J4FKvcAAAAldEVYdGRhdGU6Y3JlYXRlADIwMTYtMDgtMTVUMTU6NDQ6MjArMDI6MDAt6ED0AAAAJXRFWHRkYXRlOm1vZGlmeQAyMDE2LTA4LTE1VDE1OjQ0OjIwKzAyOjAwXLX4SAAAABl0RVh0U29mdHdhcmUAd3d3Lmlua3NjYXBlLm9yZ5vuPBoAAAAASUVORK5CYII=);\n}\n.play-control .btn-wrap .play-btn.playing {\n  background-image: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAQAAAAAYLlVAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAAAmJLR0QAAKqNIzIAAAAJcEhZcwAADdcAAA3XAUIom3gAAAAHdElNRQfgCA8PLRCEQucDAAAAx0lEQVRo3u3ZMQ6CQBCF4cVTaNTGyoRwZxOpLLHzEB4CCgNqYmMoH5XEtRgGgt0/W2123uzXT1Awz1Yn1SqVazPQGZ+9zrqr1EFLu9Mes9ZTn3pp5/4+1bvP1VpNB+T6rsINuES543RAFQ2q3YBHlKus3kTBqN/HJPhqRG7hHPm3AgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgA24GbeZcjbgatzmyg0sodt+AdsqHbG8dueGRmUq1KhRoWzU+t6d6wDGx82WJbGOyQAAACV0RVh0ZGF0ZTpjcmVhdGUAMjAxNi0wOC0xNVQxNTo0NToxNiswMjowMC91GRMAAAAldEVYdGRhdGU6bW9kaWZ5ADIwMTYtMDgtMTVUMTU6NDU6MTYrMDI6MDBeKKGvAAAAGXRFWHRTb2Z0d2FyZQB3d3cuaW5rc2NhcGUub3Jnm+48GgAAAABJRU5ErkJggg==);\n}\n.play-control .btn-wrap .next-btn {\n  background-image: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAQAAAAAYLlVAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAAAmJLR0QAAKqNIzIAAAAJcEhZcwAADdcAAA3XAUIom3gAAAAHdElNRQfgCA8PLg3MadgZAAADeElEQVRo3sXZf2hVZRzH8deWTkyn1VCkkEIKpLa5ZstilqVQhFCGRSEbqSXRD/zDpEXRD8pipgUzWrDRHN1hRZNcKFliNdPEZivnjKCSIoooLM1++WM7/bGDjK27nbt77tn3/Pe9z/N83nzOF+7n3kdgwFMUfBxsDyoH9bN9CoP24FBQMrA/eOHzQRAEQU9QGxTECrA0CIIgqBvYzzewpoJ8NTqUiq/OAZMHtvOH2FKqw8NDroih0h3f4RQKrNVuxmgAbDLHITDXASuSB+Bzs72gFxM12Gpa0gCcsNp834GFui1OGgDaldoIirRKDZ7iXANw3HKL/AKqHLQgaQBoU2wLmG6HOuOTBuBXt1rmD+RZqdMVSQNAs1IfgZn2etKYpAH43nwP+RdjPOUTM5MGIPCi2TpBhU4r5SULAF+6yho9GK/ODtOTBuCUx1X6GixwUFXSALBPmXowWUqroqQB+NsDbvQjWKzbwqQB4H0lXgfTbNVgYtIA/G6JO/0GVjhgbtIA8KYS28EM7WoVJA3AT25yv79knCbjTHyvKLMXfWmyJtrZ8UbOb1zjsTBN1toVJU3GnXl7POfKME1WRkmTuQjdX2SSJnOT+k9Y7fp+afK2pAFgl1JNoMhbUuEvo0EVS6hIU8fdrU2jqagSJO1AX71zJk2myQ25BuifJkcJYJjK5Qz01RQNFqX/ONcO3Kw7lB+FISz0qrbwD48WTycNcK0uy8ERt6t2NEmAcdb70EVgm2Kt6ZfmYgjLtLgM/GmVxqEXx+3AWR71aSi/x6zh5ON24GKvuRqc9IR1eoffEifAfdaZALpU64q2Ka5XcL531ZuAXmtVRJWPy4E71DsPHHaX3Zlszd6Bc23yRijfaFZm8tk7cIMmF4Cf3WNb5gdk48DZXvZeKL9Z8Ujks3FgjpRLwDEPahnpMSNzYKxn7AnldyoZufzIHLhUSjn4xyNeSvdFmxsH8qzyWSjfodyG7OQzdeBCza4Dp63xrNPZiWcKsFSdSeAr1fZnL070VzDF2zaahMAG5XHJR3XgFg1htPrBMjvjEo/mQKEmW84ku5J45Yd3YJ7mMFodca/N8YoP58A4633QL9nlQH4oBy6Xip7s4ndgiX2h/O4oyS5+gApjcVKNeQ7nTn7oIcwg2cXpQN/1VIbJLkIdBccG9f/n+v7bYH9y1/f/AXsjkvLjtIdFAAAAJXRFWHRkYXRlOmNyZWF0ZQAyMDE2LTA4LTE1VDE1OjQ2OjEzKzAyOjAwlnqNtwAAACV0RVh0ZGF0ZTptb2RpZnkAMjAxNi0wOC0xNVQxNTo0NjoxMyswMjowMOcnNQsAAAAZdEVYdFNvZnR3YXJlAHd3dy5pbmtzY2FwZS5vcmeb7jwaAAAAAElFTkSuQmCC);\n}\n.play-control .btn-wrap .list-btn {\n  background-image: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAQAAAAAYLlVAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAAAmJLR0QAAKqNIzIAAAAJcEhZcwAADdcAAA3XAUIom3gAAAAHdElNRQfgCA8PLzSKd2FQAAACrUlEQVRo3u2ZTYhNYRjHf3e6GaJsfDQflCJqrMyMRoaE3c3ERgkldhQ2pBSanVI+UgaxYsMg30xImqQJC4VZUBYzw8j4qJl8TOZn4cx175lYHe+ZxX3u4t7zdur93fM+z/P+z//NSLpRlvL8ow2gkolpAdTQSjfdfKKTFiYFJBAz7vKbhdHrSgnzQdziyBi0LhTALAdU7XKtVc52R3T93PIwAAdV/eDU/OBih1RdFQIgSy0AB+jNp8UDrtIE1HOpKF2qaaEu0QTsYy9+VnVJEdceVW/FaPeZfLwp4y0AVUVkFQD0xHgfMZR4ET7M8oQ5wAbO5gcn0gRAR+zmW8xgXsJL0I5roodxxLEiVtim6ndnhuoD1/Lt56Jt9kdXu0P1Aazw9YjkaDMbDgDHezSqfdUBt5oJM71k8oJkGg3U008HHXxMPNv/GpmSIioBlADSBshG3+WsYz619POEB1wOSCBinc+LGvENq0J1QsRGB0fsBb1ODgUwIdqKhjzjJrd5L0JoDQWwW9Wf5vKDeyOExhAAWRYAcJzr+bRoZgW1wELai9KlnPWJi9KT2KNa8P8R96t6IUa7+T+I0o5R0AeekgNyBUuQYRkwUpSe4sf/WIKUk3AUlGHqjQhTbcXDmjC1zagkSksAJYDUAbL5X9XUR33gMZ8CEog4zsNpvZ4jTrUzXYPiSjRpl+e9Gdl2AS2aYZPqUGTNTvF2SJMqSw6AO2yPkuI9q3lBJWNYzqtYwsyKfNWkoo+7+FLVtUVcx1Q9HaPNFSRqUnGuLHJFu4vIfrunlTHeejKJF+H8LM9YBDRwv2D494N+Grv5BHMTF6XNw3Z9X4EGWhrSrv9zYPHOjU53tjv9qgY8sEj9yGYUHFoh1thqtzpkpy1OCjW9MVFayQBfEi+1f0ZJFacO8Avw6Kz+nY8ROgAAACV0RVh0ZGF0ZTpjcmVhdGUAMjAxNi0wOC0xNVQxNTo0Nzo1MiswMjowMFuF48cAAAAldEVYdGRhdGU6bW9kaWZ5ADIwMTYtMDgtMTVUMTU6NDc6NTIrMDI6MDAq2Ft7AAAAGXRFWHRTb2Z0d2FyZQB3d3cuaW5rc2NhcGUub3Jnm+48GgAAAABJRU5ErkJggg==);\n}\n.play-list {\n  width: 100%;\n  height: 216px;\n  background: #fff;\n  z-index: 1000;\n  bottom: -216px;\n  position: absolute;\n}\n.play-list div {\n  height: 30px;\n  line-height: 30px;\n  font-size: 22px;\n  border-bottom: 1px solid gray;\n  border-radius: 5px;\n  text-align: center;\n}\n.play-list ul li {\n  width: 100%;\n  height: 30px;\n  line-height: 30px;\n  font-size: 16px;\n  border-bottom: 1px solid gray;\n  border-radius: 5px;\n  text-align: center;\n}\n.play-list .playing {\n  color: red;\n}\n.show {\n  -webkit-animation: cube 0.5s  ease;\n  animation: cube 0.5s  ease;\n  -webkit-animation-fill-mode: forwards;\n  animation-fill-mode: forwards;\n}\n.hide {\n  -webkit-animation: returnCube 0.5s  ease;\n  animation: returnCube 0.5s  ease;\n  -webkit-animation-fill-mode: forwards;\n  animation-fill-mode: forwards;\n}\n@keyframes cube {\n  0% {\n    bottom: -216px;\n  }\n  100% {\n    bottom: 0;\n  }\n}\n@keyframes returnCube {\n  0% {\n    bottom: 0;\n  }\n  100% {\n    bottom: -216px;\n  }\n}\n", ""]);
 
 	// exports
 
@@ -10760,48 +10754,6 @@
 
 /***/ },
 /* 5 */
-/***/ function(module, exports) {
-
-	module.exports = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAQAAAAAYLlVAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAAAmJLR0QAAKqNIzIAAAAJcEhZcwAADdcAAA3XAUIom3gAAAAHdElNRQfgCA8PNAuVJ4f3AAAEnElEQVRo3uXZW4hVVRzH8f85ppmNlaBE5nRx7DpNCSNEF8gukhZ0sSjUICiCsujyUuFLURAahdSD9VJgdIFKeim6YCkFkpV0oYtoo5kmk2mmzjQzNud8ejh7nBk958zZe5ozD+3/01lr/X7/79p77bPX/u+cGN0jP8r546iKPbm4MC6Ok2NqnBDboy3aYlN8V+OkZsaMmB5N0Rh7Y2f8FutifVQ61cpFsxftdOTxo3tNFFViskdsLaPc6UXN5RTlLFboTWQF7b621i+Kh6z2W25C2eRTvaL70Liibdb6WrtC0tJrhclDAcy1F/RYZcGA2R6jxSJfJFbfmn5E+sv9nvSusdDMAZATLbBKD9hrbjWA+5O5ryqToBTzfA7+dM2A1pwlifI9F1dQTrcqOQ/3VwJ4HPxlXtWrHO7Qi4KbD7W8BHa7ZAjlPPvA4+UAblLEVucOYRLCjbqx35lCWAy2O6cGZYtfUXTT4QDn6cAu02owCWGODnznGBc5iI1OqVF5mt3ocN5ggM/Q64oaTUJYBN70G/aZmkJ5pV58NhDgevBECpM+6NLxQEplabVd3wcwxk9od2xKm5nJHf6NMSmVE+zET8aUAK4G96Q0CWEFihVvvGpxF7i6BLASe43LYHOyf7yfQRfG2oOVIoy3Dy9lsglvuTaj8mXsMz7MBVdltGmWz6i8BszNxwURUYhPMz7Of4hiRuWaKEbEBfloiYi2OPjfbC9SHF3RFhEtJYAf654+IuL7EsC0iNg0KgCbI2JaPhoi4sCoAByIiIZ8dEXEpFEBmBQRXfn4OSJmjArAjIj4uQTQNCoATSWAzRHRFLm6p89FU0RsLgGMj+a6AzTH+BLA6hARN9Qd4IaIEKtDWIevMv6jZ4+vsE7kI+KdiGiNxrrOvzFak8xCE1ha1/kvBU19e8J30WFK3dJP0YF3RR/ALPB03QCeBrP6AUrnoFNjXdI36uybfz9AqwLWZN7f1B55a1DQOhggLAMPjzjAw2BZ3+/+jnE2oKePbISiVQ829O/BB3aerRPtzhqx9GdpR6ez+9sGD1ioiO1OH5H0p9uOooUDWw8fVHrV3jIC90OjLWDx4PYjBz6avO3XUieoPVrsAI8e3lNu8JNgj4v+s/Sz/VXp/bu84EFFdGZ+7Roct+hGwX3leiuJFjiIf9w+7PSlyXSZX76/snCOAygO668p55mkpnZppTHV5LPsAs/KZUo/zutgW7UFXd3ijOTWedXY1OmP83FS1KxaPxrK5iTfgPdTFnCm+hZ84vjqI4e2Ot5asP7IOm/FOMc28MbQdZda7I5OiqwbnVpT+kvsqX3t1DajvBfAjr7yYpW4UReKHqrtbNV+VR9Lqt2XVh21WAE9bq3VN83CulsBf7uu4oinknL37Npd0wCE+brR684yfWOtTC5TSxrPdADhsuSxsuSw9gYfgB/SPsjTAoTzk69Jzw1Y4yfaAD41Ka1feoBwmk2D7vIztIG3HZ3eLQtAmOJL8JEGF/oDPJ9tS58NIDT4EHyvc3jPzKwAYazXkq8FB92W2WUYACFnOfZnrjMPGyCEB8wcnkPuf//1/F8GuXduvHHldQAAACV0RVh0ZGF0ZTpjcmVhdGUAMjAxNi0wOC0xNVQxNTo1MjoxMSswMjowMMmA4yQAAAAldEVYdGRhdGU6bW9kaWZ5ADIwMTYtMDgtMTVUMTU6NTI6MTErMDI6MDC43VuYAAAAGXRFWHRTb2Z0d2FyZQB3d3cuaW5rc2NhcGUub3Jnm+48GgAAAABJRU5ErkJggg=="
-
-/***/ },
-/* 6 */
-/***/ function(module, exports) {
-
-	module.exports = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAQAAAAAYLlVAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAAAmJLR0QAAKqNIzIAAAAJcEhZcwAADdcAAA3XAUIom3gAAAAHdElNRQfgCA8PNBlmnva/AAAC+UlEQVRo3s2ZPUsjURSGn0ziF4KCZCGRdYlutVauLMJiZaP+AAU7/4CVhWKvIvgP1MZCQcFCwcrCQmRBxLXwAwQV/EBBBRUU3EXfLdxsTMzMZGaS3D3TJTnnee5Ncu+dMyFhNizDfCIO74WpJ0acKNeccMolLzkPK0Ydn4hyzQWXHPNs+1llu6rUoxndKD0etaAulQuHq1xdWtBjRuaNZtSjqmwZ71+q0JBuZR/3mlQ8KzyuSd07ZN5qSBVuAt06l3vcq1+RtLyI+h3hyThXt72ApdEcSiRjR43/Mhu14yFzVFY2gTIteSgiSVdqFkLNuvKYuaSy9wLTHotI0q1a1er4i7GL6UyBQR9FJOlBDz4zB1/JIQG08KPoS9IL39lIroRjBlZEi7HkQtTucxKDR7uwgIGijz4ZAxBSNVeUGBL4zQeLDmN4KKHDotMYHqDTImFUIGERNyoQt4gZFYhZlBoVKLU4MypwZnFqVOD0P5iBY6MCxxbLRgWWQ4JDGgzhj/hsAfPGxj//eiCZMyYw9yqwzaoR/Crb/D0TfmODUJHxooXN5Jlw08DXMMcmJGcAGtgv6q7wiy8cQao/cMR4Ucc//ornzZ1RWGtFOw2vKZzkht60aD7yk2gRRn/N19QO9PaG5IxeCt8yEr1pG2BGf2Ck4NM/4tYhmSgofsK9RWNptmD42betCTsBFNFiQfCLGW0dWwFUppW841dSXRF3AVSp9bzi11WZnWTf8avWVt7wW6q24zg1HaPaywt+T1F7ipMAqtVhYPyhap0YzgIooZNA+BMlnAluAqhOu77xu6pzq+8ugGp8/iPWVeNePRcBVOG5iyotvW9M+xdAYU15wk+ldvz8CCA0nDN+OPeqXgRQn55d4c/q81LTmwDq1pMj/inzeUC+BVCb7mzxd2rzWs+7AGrSRVb8hZq8V/MjgOp18A5/oHo/tfwJoJj20/D7ivmr5FcgXcE3PohASiEAPv3GxHvEWAXauPRfIpgAxCAIPrhA4DD+9PwPbiBDpp9So18AAAAldEVYdGRhdGU6Y3JlYXRlADIwMTYtMDgtMTVUMTU6NTI6MjUrMDI6MDCzQMDUAAAAJXRFWHRkYXRlOm1vZGlmeQAyMDE2LTA4LTE1VDE1OjUyOjI1KzAyOjAwwh14aAAAABl0RVh0U29mdHdhcmUAd3d3Lmlua3NjYXBlLm9yZ5vuPBoAAAAASUVORK5CYII="
-
-/***/ },
-/* 7 */
-/***/ function(module, exports) {
-
-	module.exports = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAQAAAAAYLlVAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAAAmJLR0QAAKqNIzIAAAAJcEhZcwAADdcAAA3XAUIom3gAAAAHdElNRQfgCA8PLiJnuOVAAAADbUlEQVRo3sXZfWhVZQDH8Y9zrlYzrZFIIcUokNzmWg0zxQVhBEkvtIjC0RQ2SIhBUUpF2Rs4yWJSVlpaTqxo0gwlS7SWiplaa2YI0QgkkIWhYhi+7PTHDjPu9O7e3XOfPeefy3mec75ffufC+Z1zRFK2iuhg1BmNHbQ/121GtCXaEZWm7h+8sDWKoihqSBReFC2JzkVRFEVLU+cKpY5xYLzkRqU2lfHvCamTBQmCLjQKPGPvAP6CC/I5ynRqUYQz9oYXaPSzmeCgadaHFZhok5VK0GeZW/x0sYWFWZw08/Gg95SCPzToTLc0+QTGadMe49eoTI9PPoE7rTEJ9GqycegDkkygWKutMb5DeSb4JBO4VZvJ4IRmH2Z6WDIJFHrR7hj/rcrM8ckkMNlaNeBfz3lTlJ17bmOUJyxRDH5U79dsT5DbJZhkq1bFOOdVt2WPzy2Bud6K752/qbdneCcZbgKl2rXF+BWqhosfbgL3eN9E8Kf5vh4ufHgJlFhpU4z/WEVu+OwTmOkjZeBvC3yaGzzbBIos0Rnjt6hIAp9NAueb3T+e9k4S8MwTKLBwoNntVpUcPrMEyqw1A5yxWItzyeEzEWj0hhJw0FxdScIZ6hKkNrvE8ekTqPPuQLN7zHfJw9MlMF6bz2L8apX5wl88gReMAr0afZEveLoE+vEdyvOLT/cnPGGeB/yVX3z+H05zELjCGp+7eqQE+ovl/X5x78gIvGwdmGCjD4wNL3BMvYccBfN1mxVaANqV2wyu943XXRJagCPmaHISBZ6yX1VoAVhlql1gih88a3RoAXrMsshpjPGaHW4ILUCfFjW6wXRdHg8tAN1qtOjD5Vb40jWhBThtkVo94G4HPBxaAHaaahW4yifWuzK0ACc1meMIeMQBd4UWgM3KbQDX+srbLgstwFF16h0HC3SZFloA1qmwDdxol1eMCS3AYbM1O4XRnve9m0ILEFmuOn4TXm2/J+M2GUwADrndYmdxqWW2uy60AGe9ZLpD4A7dGkILwD7Vlotk2SaTbMWnNJvtMPrb5H2hBWCbioE22WH10G0y+eeC4+rVxW1ynm61oQVgw//a5Pb0bTJfT0apbfLm0AL0t8mdYIo9Hg0vQI9aC+M2WTMSAvRZOtAmMxTov8UeS1DifJukd9BswM/3+6LfB3++/w+wTZDpuv6r2wAAACV0RVh0ZGF0ZTpjcmVhdGUAMjAxNi0wOC0xNVQxNTo0NjozNCswMjowMBH4tEQAAAAldEVYdGRhdGU6bW9kaWZ5ADIwMTYtMDgtMTVUMTU6NDY6MzQrMDI6MDBgpQz4AAAAGXRFWHRTb2Z0d2FyZQB3d3cuaW5rc2NhcGUub3Jnm+48GgAAAABJRU5ErkJggg=="
-
-/***/ },
-/* 8 */
-/***/ function(module, exports) {
-
-	module.exports = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAQAAAAAYLlVAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAAAmJLR0QAAKqNIzIAAAAJcEhZcwAADdcAAA3XAUIom3gAAAAHdElNRQfgCA8PLBSaNBJbAAADfUlEQVRo3sXZe6zXcxzH8cc5uizdcGQNjYWt0e84qiNWRBlzmbJsLIWDXFd/VFNjLptYN7ZC5sTp6CRMTVGkhEqaTlKdmA2NucwYRm5dzvn443x3Rqd+53d+v9/34/397/v7fL/P5+/1/f7x2vcjOOgoCxvD6jCk1fmUjtanZoUQQmgMM0KnGAKlDp7jQKmp6pVLfUqz/Fau3tSsK1IUqLcfncywXt//Q2CJwT4GQ+0wPr4AHxnoUU3optpKvWMLsNcUw30JLrfL6NgCsF65haDMUnV6xhZgj5uM8gMYq8GI2AKwQn/LQR9rzdUltgA/ukqV31Biom0qYwtArXLvgn7e96AOsQX4ynCT/Y0OHrBZv9gCBI8ZaBsYZJuJSuIKwCfOMV0juphrrT6xBdjvPkN8BkZoMC62AHygwnzQ0yJLHRtbgD/d5RLfgtEaXBFbANbIeAH09poFusUW4BdjXOtncIsdhsYWgJdkrAZ9rTdTp9gCfOdSd/oDpe62Nfc2WczG95QKm0Em9zZZ3Mr5ufPc29ImNzgltgCNHnF20iaH2O7W2AKw/V9t8mmrsrfJdFr/XlNcmLTJy+xydWwB2KBcDSjzssWOii3AHjcbmbTJ6zS4KLYAvNrSJk+0xrzWvLQF/tsmJxgTX6CNKUqxzDq9VBsFgicsiS1wpQXJF4dvVHmr9YI0H0F3z1qR4J+XORQ+zQTO95yTwU9ut/Rwy9JJoLM53knwr+t/eHw6CVRY7Azwu8mqsy8udgJHuMeWBL9JRVv4YidwqkXOBfvcb7amti8ppsAdZusKGoy1M7eLivUIjveG+bqiySyDcsUXK4FrzHcM2O0G77Xn0sITONoSLyb4Z5zZPnzhCVysxgnge+OtbP8NCkngSE96M8Evk8kHX0gCg9U5Dfxqgrp8b5NfAh09ZFOCXyeTPz6/BE5XZwD4yzSPC/nj259AiUk+TPBbDTCvMHx7EzhJrQvAAQ+b7kBh8PYK3GiuHuBT16svHE7uj6CXVyzUA8E8A4qFzzWBkaqTavW1KuuKBc8tge5qLE/wi2WKi287gWFqW5rdbZYVF95WAp3N8XaCX6V/GvhsCZylrqXZTbIgDTgOsXNaG0IIYUvYF5pnY+gbd+e0eSp1xD7TDLM7tX8v+0u407jcq1W+0zqB5g8KTWaqTB/vEO9AWfgibI23ff8P9RjT3J4FKvcAAAAldEVYdGRhdGU6Y3JlYXRlADIwMTYtMDgtMTVUMTU6NDQ6MjArMDI6MDAt6ED0AAAAJXRFWHRkYXRlOm1vZGlmeQAyMDE2LTA4LTE1VDE1OjQ0OjIwKzAyOjAwXLX4SAAAABl0RVh0U29mdHdhcmUAd3d3Lmlua3NjYXBlLm9yZ5vuPBoAAAAASUVORK5CYII="
-
-/***/ },
-/* 9 */
-/***/ function(module, exports) {
-
-	module.exports = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAQAAAAAYLlVAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAAAmJLR0QAAKqNIzIAAAAJcEhZcwAADdcAAA3XAUIom3gAAAAHdElNRQfgCA8PLRCEQucDAAAAx0lEQVRo3u3ZMQ6CQBCF4cVTaNTGyoRwZxOpLLHzEB4CCgNqYmMoH5XEtRgGgt0/W2123uzXT1Awz1Yn1SqVazPQGZ+9zrqr1EFLu9Mes9ZTn3pp5/4+1bvP1VpNB+T6rsINuES543RAFQ2q3YBHlKus3kTBqN/HJPhqRG7hHPm3AgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgA24GbeZcjbgatzmyg0sodt+AdsqHbG8dueGRmUq1KhRoWzU+t6d6wDGx82WJbGOyQAAACV0RVh0ZGF0ZTpjcmVhdGUAMjAxNi0wOC0xNVQxNTo0NToxNiswMjowMC91GRMAAAAldEVYdGRhdGU6bW9kaWZ5ADIwMTYtMDgtMTVUMTU6NDU6MTYrMDI6MDBeKKGvAAAAGXRFWHRTb2Z0d2FyZQB3d3cuaW5rc2NhcGUub3Jnm+48GgAAAABJRU5ErkJggg=="
-
-/***/ },
-/* 10 */
-/***/ function(module, exports) {
-
-	module.exports = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAQAAAAAYLlVAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAAAmJLR0QAAKqNIzIAAAAJcEhZcwAADdcAAA3XAUIom3gAAAAHdElNRQfgCA8PLg3MadgZAAADeElEQVRo3sXZf2hVZRzH8deWTkyn1VCkkEIKpLa5ZstilqVQhFCGRSEbqSXRD/zDpEXRD8pipgUzWrDRHN1hRZNcKFliNdPEZivnjKCSIoooLM1++WM7/bGDjK27nbt77tn3/Pe9z/N83nzOF+7n3kdgwFMUfBxsDyoH9bN9CoP24FBQMrA/eOHzQRAEQU9QGxTECrA0CIIgqBvYzzewpoJ8NTqUiq/OAZMHtvOH2FKqw8NDroih0h3f4RQKrNVuxmgAbDLHITDXASuSB+Bzs72gFxM12Gpa0gCcsNp834GFui1OGgDaldoIirRKDZ7iXANw3HKL/AKqHLQgaQBoU2wLmG6HOuOTBuBXt1rmD+RZqdMVSQNAs1IfgZn2etKYpAH43nwP+RdjPOUTM5MGIPCi2TpBhU4r5SULAF+6yho9GK/ODtOTBuCUx1X6GixwUFXSALBPmXowWUqroqQB+NsDbvQjWKzbwqQB4H0lXgfTbNVgYtIA/G6JO/0GVjhgbtIA8KYS28EM7WoVJA3AT25yv79knCbjTHyvKLMXfWmyJtrZ8UbOb1zjsTBN1toVJU3GnXl7POfKME1WRkmTuQjdX2SSJnOT+k9Y7fp+afK2pAFgl1JNoMhbUuEvo0EVS6hIU8fdrU2jqagSJO1AX71zJk2myQ25BuifJkcJYJjK5Qz01RQNFqX/ONcO3Kw7lB+FISz0qrbwD48WTycNcK0uy8ERt6t2NEmAcdb70EVgm2Kt6ZfmYgjLtLgM/GmVxqEXx+3AWR71aSi/x6zh5ON24GKvuRqc9IR1eoffEifAfdaZALpU64q2Ka5XcL531ZuAXmtVRJWPy4E71DsPHHaX3Zlszd6Bc23yRijfaFZm8tk7cIMmF4Cf3WNb5gdk48DZXvZeKL9Z8Ujks3FgjpRLwDEPahnpMSNzYKxn7AnldyoZufzIHLhUSjn4xyNeSvdFmxsH8qzyWSjfodyG7OQzdeBCza4Dp63xrNPZiWcKsFSdSeAr1fZnL070VzDF2zaahMAG5XHJR3XgFg1htPrBMjvjEo/mQKEmW84ku5J45Yd3YJ7mMFodca/N8YoP58A4633QL9nlQH4oBy6Xip7s4ndgiX2h/O4oyS5+gApjcVKNeQ7nTn7oIcwg2cXpQN/1VIbJLkIdBccG9f/n+v7bYH9y1/f/AXsjkvLjtIdFAAAAJXRFWHRkYXRlOmNyZWF0ZQAyMDE2LTA4LTE1VDE1OjQ2OjEzKzAyOjAwlnqNtwAAACV0RVh0ZGF0ZTptb2RpZnkAMjAxNi0wOC0xNVQxNTo0NjoxMyswMjowMOcnNQsAAAAZdEVYdFNvZnR3YXJlAHd3dy5pbmtzY2FwZS5vcmeb7jwaAAAAAElFTkSuQmCC"
-
-/***/ },
-/* 11 */
-/***/ function(module, exports) {
-
-	module.exports = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAQAAAAAYLlVAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAAAmJLR0QAAKqNIzIAAAAJcEhZcwAADdcAAA3XAUIom3gAAAAHdElNRQfgCA8PLzSKd2FQAAACrUlEQVRo3u2ZTYhNYRjHf3e6GaJsfDQflCJqrMyMRoaE3c3ERgkldhQ2pBSanVI+UgaxYsMg30xImqQJC4VZUBYzw8j4qJl8TOZn4cx175lYHe+ZxX3u4t7zdur93fM+z/P+z//NSLpRlvL8ow2gkolpAdTQSjfdfKKTFiYFJBAz7vKbhdHrSgnzQdziyBi0LhTALAdU7XKtVc52R3T93PIwAAdV/eDU/OBih1RdFQIgSy0AB+jNp8UDrtIE1HOpKF2qaaEu0QTsYy9+VnVJEdceVW/FaPeZfLwp4y0AVUVkFQD0xHgfMZR4ET7M8oQ5wAbO5gcn0gRAR+zmW8xgXsJL0I5roodxxLEiVtim6ndnhuoD1/Lt56Jt9kdXu0P1Aazw9YjkaDMbDgDHezSqfdUBt5oJM71k8oJkGg3U008HHXxMPNv/GpmSIioBlADSBshG3+WsYz619POEB1wOSCBinc+LGvENq0J1QsRGB0fsBb1ODgUwIdqKhjzjJrd5L0JoDQWwW9Wf5vKDeyOExhAAWRYAcJzr+bRoZgW1wELai9KlnPWJi9KT2KNa8P8R96t6IUa7+T+I0o5R0AeekgNyBUuQYRkwUpSe4sf/WIKUk3AUlGHqjQhTbcXDmjC1zagkSksAJYDUAbL5X9XUR33gMZ8CEog4zsNpvZ4jTrUzXYPiSjRpl+e9Gdl2AS2aYZPqUGTNTvF2SJMqSw6AO2yPkuI9q3lBJWNYzqtYwsyKfNWkoo+7+FLVtUVcx1Q9HaPNFSRqUnGuLHJFu4vIfrunlTHeejKJF+H8LM9YBDRwv2D494N+Grv5BHMTF6XNw3Z9X4EGWhrSrv9zYPHOjU53tjv9qgY8sEj9yGYUHFoh1thqtzpkpy1OCjW9MVFayQBfEi+1f0ZJFacO8Avw6Kz+nY8ROgAAACV0RVh0ZGF0ZTpjcmVhdGUAMjAxNi0wOC0xNVQxNTo0Nzo1MiswMjowMFuF48cAAAAldEVYdGRhdGU6bW9kaWZ5ADIwMTYtMDgtMTVUMTU6NDc6NTIrMDI6MDAq2Ft7AAAAGXRFWHRTb2Z0d2FyZQB3d3cuaW5rc2NhcGUub3Jnm+48GgAAAABJRU5ErkJggg=="
-
-/***/ },
-/* 12 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/*
