@@ -1,38 +1,8 @@
 [
     {
-        "image": "./source/img/album1.jpeg",
-        "audio": "./source/audio/audio1.flac",
-        "song": "爱情废柴",
-        "rhythm": "周杰伦",
-        "lyric": "周杰伦",
-        "album": "周杰伦的床边故事",
-        "singer": "周杰伦",
-        "duration": 285
-    },
-    {
-        "image": "./source/img/album2.jpeg",
-        "audio": "./source/audio/audio2.flac",
-        "song": "不能说的秘密",
-        "rhythm": "周杰伦",
-        "lyric": "方文山",
-        "album": "《不能说的秘密》电影插曲",
-        "singer": "周杰伦",
-        "duration": 296
-    },
-    {
-        "image": "./source/img/album3.jpeg",
-        "audio": "./source/audio/audio3.flac",
-        "song": "蒲公英的约定",
-        "rhythm": "周杰伦",
-        "lyric": "方文山",
-        "album": "我很忙",
-        "singer": "周杰伦",
-        "duration": 247
-    },
-    {
         "image": "./source/img/album4.jpeg",
-        "audio": "./source/audio/audio4.flac",
-        "song": "周听妈妈的话",
+        "audio": "./source/audio/audio4.mp3",
+        "song": "听妈妈的话",
         "rhythm": "周杰伦",
         "lyric": "周杰伦",
         "album": "依然范特西",
@@ -40,8 +10,38 @@
         "duration": 265
     },
     {
+        "image": "./source/img/album2.jpeg",
+        "audio": "./source/audio/audio2.mp3",
+        "song": "稻香",
+        "rhythm": "周杰伦",
+        "lyric": "方文山",
+        "album": "魔杰座",
+        "singer": "周杰伦",
+        "duration": 223
+    },
+    {
+        "image": "./source/img/album1.jpeg",
+        "audio": "./source/audio/audio1.mp3",
+        "song": "爱情废柴",
+        "rhythm": "周杰伦",
+        "lyric": "周杰伦",
+        "album": "周杰伦的床边故事",
+        "singer": "周杰伦",
+        "duration": 268
+    },
+    {
+        "image": "./source/img/album3.jpeg",
+        "audio": "./source/audio/audio3.mp3",
+        "song": "青花瓷",
+        "rhythm": "周杰伦",
+        "lyric": "方文山",
+        "album": "我很忙",
+        "singer": "周杰伦",
+        "duration": 234
+    },
+    {
         "image": "./source/img/album5.jpeg",
-        "audio": "./source/audio/audio5.flac",
+        "audio": "./source/audio/audio5.mp3",
         "song": "哪里都是你",
         "rhythm": "周杰伦",
         "lyric": "周杰伦",
