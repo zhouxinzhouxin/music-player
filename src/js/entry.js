@@ -1,8 +1,10 @@
 import '../less/index.less';
 
-let dataUrl = './data/data.json';
-let $scope = $(document.body);
-let $loadingLayer = $('.loading-layer');
+let dataUrl = './data/data.json',
+    $scope = $(document.body),
+    $songImg = $scope.find('.song-img img'),
+    $loadingLayer = $('.loading-layer');
+
 
 /********** AudioManager ********/
 let AudioManager = function (dataList) {
@@ -57,9 +59,16 @@ AudioManager.prototype = {
         this.duration = data.duration;
         this.audio.src = data.audio;
         this.audio.load();
+        $songImg.removeClass('image-run');
+        $songImg.css('animationPlayState','running');
 
         if (this.autoPlay) {
-            this.play();
+
+            setTimeout(function(){
+                $songImg.addClass('image-run');
+                this.play();
+            }.bind(this), 500)
+
         }
 
         $scope.trigger('changeAudio');
@@ -91,10 +100,17 @@ AudioManager.prototype = {
     },
     play: function () {
         this.autoPlay = true;
+        console.log($songImg);
+        if($songImg.hasClass('image-run')){
+            $songImg.css('animationPlayState','running');
+        }else{
+            $songImg.addClass('image-run')
+        }
         this.audio.play();
     },
     pause: function () {
         this.autoPlay = false;
+        $songImg.css('animationPlayState','paused');
         this.audio.pause();
     }
 };
@@ -102,8 +118,8 @@ AudioManager.prototype = {
 
 /********** controlManager Start ********/
 let controlManager = (function () {
-    let $songImg = $scope.find('.song-img img'),
-        $songInfo = $scope.find('.song-info'),
+    let $songInfo = $scope.find('.song-info'),
+        $songImg = $scope.find('.song-img img'),
         $likeBtn = $scope.find('.like-btn'),
         $playBtn = $scope.find('.play-btn'),
         $timeCur = $scope.find('.cur-time'),
@@ -223,10 +239,10 @@ let controlManager = (function () {
 
     function renderInfo(info) {
         let html = '<h1 class="song-name">' + info.song + '</h1>' +
-            '<h3 class="singer-name">' + info.singer + '</h3>' +
-            '<h3 class="album-name">' + info.album + '</h3>' +
-            '<h3 class="rhythm">' + info.rhythm + '</h3>' +
-            '<h3 class="lyric">' + info.lyric + '</h3>';
+            '<h3 class="singer-name">演唱：' + info.singer + '</h3>' +
+            '<h3 class="album-name">专辑：' + info.album + '</h3>' +
+            '<h3 class="rhythm"> 作曲：' + info.rhythm + '</h3>' +
+            '<h3 class="lyric">作词：' + info.lyric + '</h3>';
 
 
         $songInfo.html(html);
