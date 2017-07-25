@@ -72,6 +72,8 @@ AudioManager.prototype = {
         }
 
         $scope.trigger('changeAudio');
+        $scope.find('ul li').removeClass('playing').eq(this.index).addClass('playing');
+
     },
     getDurationTime: function () {
         return this.duration;
@@ -94,6 +96,11 @@ AudioManager.prototype = {
         this.audio.currentTime = audioTime;
 
         this.audio.play();
+        if($songImg.hasClass('image-run')){
+            $songImg.css('animationPlayState','running');
+        }else{
+            $songImg.addClass('image-run')
+        }
     },
     getPlayRation: function () {
         return this.audio.currentTime / this.duration;
